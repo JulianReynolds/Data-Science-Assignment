@@ -2,30 +2,10 @@
 
 This project tests whether a neural network can improve professional macroeconomic forecasts from the **ECB Survey of Professional Forecasters (SPF)**.
 
-The main idea is simple: instead of forecasting inflation or GDP growth directly, the model tries to predict the **forecast error** made by professional forecasters. If these errors are partly systematic, a neural network may be able to learn a correction and improve the original forecast.
-
-## Project idea
-
-Professional forecasters provide predictions for euro area macroeconomic variables such as:
-
-- HICP inflation
-- real GDP growth
-
-This project focuses on:
-
-- **inflation**
-- **real GDP growth**
-
-For each forecast, the forecast error is defined as:
+Instead of forecasting inflation or GDP growth directly, the model learns the forecast error made by professional forecasters:
 
 ```text
 forecast_error = actual_value - SPF_forecast
-```
-
-The neural network is trained to predict this error:
-
-```text
-predicted_error = NN(features)
 ```
 
 The corrected forecast is then:
@@ -34,97 +14,74 @@ The corrected forecast is then:
 corrected_forecast = SPF_forecast + predicted_error
 ```
 
-The goal is to compare the original SPF forecast with the neural-network-corrected forecast.
+The main question is whether these forecast errors contain systematic patterns that a neural network can learn.
 
-## Research question
+## Research Question
 
-Can a neural network predict professional macroeconomic forecast errors and improve ECB SPF forecasts for inflation and real GDP growth?
+Can a neural network predict professional forecast errors and improve ECB SPF forecasts for euro-area inflation and real GDP growth?
 
 ## Data
 
-The main dataset is the **ECB Survey of Professional Forecasters (SPF)**.
+The project uses individual forecaster-level data from the ECB SPF. The focus is on:
 
-The SPF individual files contain forecasts by individual forecasters. Each file corresponds to one survey round and includes several tables, including forecasts for inflation, real GDP growth, and unemployment.
-
-For this project, the notebook uses:
-
-- individual forecaster point forecasts
+- HICP inflation
+- real GDP growth
 - rolling one-year-ahead forecasts
-- HICP inflation forecasts
-- real GDP growth forecasts
 
-The rolling one-year-ahead horizon is used because it gives a more consistent forecasting setup than mixing current-year and next-year forecasts.
+The rolling one-year horizon is used because it gives a consistent forecasting setup across survey rounds.
 
-## Methodology
+External predictors are added from public sources, including Eurostat, ECB SDW, Yahoo Finance, FRED, and European Commission sentiment indicators. Step 2 also includes EU country-level macro variables such as inflation, GDP growth, unemployment, and industrial production, since country-level conditions can affect euro-area outcomes.
 
-The notebook follows these steps:
+## Project Workflow
 
-1. Download the ECB SPF data directly in the notebook.
-2. Parse the individual survey-round CSV files.
-3. Extract inflation and real GDP growth forecasts.
-4. Keep rolling one-year-ahead point forecasts.
-5. Build a clean forecaster-level dataset.
-6. Add realized inflation and GDP growth outcomes.
-7. Define forecast errors.
-8. Create predictor variables.
-9. Train benchmark models.
-10. Train a neural network.
-11. Compare raw SPF forecasts with corrected forecasts.
+The current pipeline is split into three notebooks:
 
-## Main features
+1. `step1_data_cleaning.ipynb`
+   - cleans the raw SPF individual files
+   - builds long and wide SPF datasets
+   - classifies rolling forecast horizons
 
-Possible predictors include:
+2. `step2_predictor_dataset.ipynb`
+   - builds the external predictor dataset
+   - adds euro-area macro-financial variables
+   - adds EU country-level macro predictors
+   - saves `Data/external_predictors.csv`
 
-- individual SPF forecast
-- average SPF forecast
-- median SPF forecast
-- disagreement across forecasters
-- number of forecasters in the survey round
-- distance between individual forecast and consensus forecast
-- previous forecast error
-- survey year
-- survey quarter
-- crisis or high-inflation period indicators
+3. `step3_final_dataset.ipynb`
+   - merges SPF forecasts with external predictors
+   - adds realized Eurostat outcomes
+   - filters to valid rolling one-year forecasts
+   - calculates the neural-network target variables
+   - saves `Data/final_model_dataset.csv`
 
-## Models
-
-The neural network is compared against simple benchmarks:
-
-- raw SPF forecast, with no correction
-- mean forecast-error correction
-- linear regression
-- neural network correction
-
-The neural network only adds value if it improves out-of-sample performance compared with these baselines.
-
-## Evaluation
-
-Forecast performance is evaluated using:
-
-- RMSE
-- MAE
-- out-of-sample performance
-- comparison of raw SPF forecasts and corrected forecasts
-
-The main output is a table comparing model performance for inflation and real GDP growth.
-
-## Repository structure
+## Main Output Files
 
 ```text
-.
-├── notebook.ipynb          # Main project notebook
-├── data/                   # Optional local data folder
-├── outputs/                # Figures and results tables
-├── nn_replication_a100.ipynb  # Neural network replication notebook that will be used as base, now it need a lot of changes
-└── README.md               # Project description
+Data/spf_clean_long.csv          # Clean SPF data in long panel format
+Data/spf_clean_wide.csv          # Clean SPF data in wide forecaster-level format
+Data/external_predictors.csv     # Survey-round external predictors
+Data/final_model_dataset.csv     # Final dataset for model training
 ```
 
-## Expected output
+## Modelling Idea
 
-The final notebook should show whether a neural network can improve professional forecasts by learning systematic forecast errors.
+The neural network will be trained to predict `forecast_error`. Its correction can then be added to the original SPF forecast and compared against:
 
-A successful result would mean that the neural-network-corrected forecast has lower prediction error than the original SPF forecast.
+- the raw SPF forecast
+- simple average-error corrections
+- linear benchmark models
+- the neural-network-corrected forecast
+
+Forecast performance will be evaluated out of sample using RMSE and MAE.
+
+## Environment
+
+The project uses a local Python 3.12.12 virtual environment in `.venv`. The notebooks are configured to use the kernel:
+
+```text
+Python 3.12.12 (.venv Final Assignment)
+```
 
 ## Notes
 
-This is a data science project, not a full macroeconomic forecasting paper. The focus is on building a clean, reproducible notebook that downloads the data, prepares the forecast-error target, trains models, and evaluates the results clearly.
+This is a data science project, not a full macroeconomic forecasting paper. The goal is to build a clean and reproducible pipeline, then test whether a neural network can learn useful corrections to professional forecasts.
