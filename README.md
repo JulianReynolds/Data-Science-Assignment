@@ -22,15 +22,46 @@ Can a neural network predict professional forecast errors and improve ECB SPF fo
 
 ## Data
 
-The project uses individual forecaster-level data from the ECB SPF. The focus is on:
+The project combines three data sources:
 
-- HICP inflation
-- real GDP growth
-- rolling one-year-ahead forecasts
+1. **ECB SPF individual forecasts**
+   - forecaster-level survey data
+   - HICP inflation and real GDP growth
+   - rolling one-year-ahead forecasts are the main horizon
 
-The rolling one-year horizon is used because it gives a consistent forecasting setup across survey rounds.
+2. **EA-MD-QD euro-area macro dataset**
+   - maintained quarterly euro-area macro and financial panel
+   - includes GDP, inflation, labour market, industrial production, interest rates, confidence, money, and market variables
+   - processed output used here: `Data/EA-MD-QD-2026-04/data_TR2/EAdataQM_TR2.xlsx`
 
-External predictors are now based on the maintained **EA-MD-QD** euro-area macro dataset. This replaces the earlier API-based predictor notebook and keeps the macro inputs cleaner, better documented, and easier to reproduce.
+3. **Eurostat realized outcomes**
+   - official realized HICP inflation and real GDP growth
+   - used to calculate the forecast-error target
+
+The final model dataset starts in **2000Q2**, because earlier SPF rows do not have matched EA-MD-QD macro predictors. Rows without macro values are dropped before training.
+
+## How the Final Dataset Is Built
+
+The neural network does not predict inflation or GDP growth directly. It predicts:
+
+```text
+forecast_error = actual_value - rolling_1y_forecast
+```
+
+`step3_final_dataset.ipynb` builds this dataset as follows:
+
+- starts from `Data/spf_clean_wide.csv`
+- keeps only rows with a valid rolling one-year-ahead SPF forecast
+- downloads realized HICP and RGDP outcomes from Eurostat
+- calculates `forecast_error`, `abs_forecast_error`, and `squared_forecast_error`
+- adds SPF consensus features, such as the survey-round mean and disagreement
+- adds leak-safe past forecast-error features
+- merges EA-MD-QD predictors by survey round
+- drops rows where EA-MD-QD macro predictors are missing
+
+The EA-MD-QD merge is conservative. For an SPF survey in quarter `t`, the model uses the latest completed EA-MD-QD quarter before that survey. For example, a `2012Q1` survey uses `2011Q4` macro predictors. This avoids giving the neural network information that forecasters may not have had yet.
+
+Past forecast-error features are also built conservatively. A past error is only used after its target period is old enough to plausibly be known, so future realized values do not leak into the model.
 
 ## Project Workflow
 
@@ -42,16 +73,21 @@ The current pipeline is split into the main SPF cleaning/final-dataset notebooks
    - classifies rolling forecast horizons
 
 2. `Data/EA-MD-QD-2026-04/RUN.ipynb`
-   - runs the maintained EA-MD-QD preprocessing routine
-   - creates the processed euro-area macro panel
+   - runs the maintained EA-MD-QD preprocessing routine, `routine_data.py`
+   - processes `EAdata.xlsx` into a quarterly euro-area predictor panel
    - saves `Data/EA-MD-QD-2026-04/data_TR2/EAdataQM_TR2.xlsx`
 
 3. `step3_final_dataset.ipynb`
-   - merges SPF forecasts with external predictors
+   - merges SPF forecasts with EA-MD-QD predictors
    - adds realized Eurostat outcomes
    - filters to valid rolling one-year forecasts
    - calculates the neural-network target variables
    - saves `Data/final_model_dataset.csv`
+
+4. `nn_replication_a100.ipynb`
+   - loads `Data/final_model_dataset.csv`
+   - trains separate neural networks for HICP and RGDP forecast errors
+   - uses chronological expanding-window splits
 
 ## Main Output Files
 
@@ -60,6 +96,45 @@ Data/spf_clean_long.csv          # Clean SPF data in long panel format
 Data/spf_clean_wide.csv          # Clean SPF data in wide forecaster-level format
 Data/EA-MD-QD-2026-04/data_TR2/EAdataQM_TR2.xlsx  # Processed EA macro predictors
 Data/final_model_dataset.csv     # Final dataset for model training
+```
+
+Current final dataset:
+
+```text
+Rows: 9,810
+Columns: 155
+Survey rounds: 2000Q2 to 2025Q3
+Variables: HICP and RGDP
+```
+
+The same final CSV was also uploaded to Google Drive as:
+
+```text
+final_model_dataset_macro_matched.csv
+```
+
+## Running the EA-MD-QD Script
+
+Use `Data/EA-MD-QD-2026-04/RUN.ipynb` when the raw EA-MD-QD workbook changes or when the processed file needs to be rebuilt.
+
+That notebook is a small wrapper around the authors' own `routine_data.py` script. We use their script because it applies the dataset's intended transformations and imputation rules, instead of manually recreating them. This keeps the macro predictor panel closer to the maintained source.
+
+To run it, open `Data/EA-MD-QD-2026-04/RUN.ipynb` and run all cells. The notebook feeds the required options into `routine_data.py` and writes the processed output automatically.
+
+The current settings are:
+
+```text
+Country: EA
+Frequency: QM
+Transformation: light
+Impute missing values: yes
+Imputation method: 0
+```
+
+The resulting file is:
+
+```text
+Data/EA-MD-QD-2026-04/data_TR2/EAdataQM_TR2.xlsx
 ```
 
 ## Modelling Idea
