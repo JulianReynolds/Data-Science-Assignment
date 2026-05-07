@@ -114,6 +114,10 @@ def main():
         # ======================== #
         spec['trans'] = trans
         xt = EA_transform(data, spec)
+        inf_mask = np.isinf(xt)
+        if np.any(inf_mask):
+            print(f"Detected {int(inf_mask.sum())} infinite transformed values: replacing with NaN before imputation")
+            xt[inf_mask] = np.nan
 
         # ===================== #
         #  STEP 4: Impute Data  #
@@ -907,7 +911,6 @@ def kalman(Y, pars):
 
 if __name__ == '__main__':
     Xc = main()
-
 
 
 

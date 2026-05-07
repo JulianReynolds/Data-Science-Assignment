@@ -30,22 +30,21 @@ The project uses individual forecaster-level data from the ECB SPF. The focus is
 
 The rolling one-year horizon is used because it gives a consistent forecasting setup across survey rounds.
 
-External predictors are added from public sources, including Eurostat, ECB SDW, Yahoo Finance, FRED, and European Commission sentiment indicators. Step 2 also includes EU country-level macro variables such as inflation, GDP growth, unemployment, and industrial production, since country-level conditions can affect euro-area outcomes.
+External predictors are now based on the maintained **EA-MD-QD** euro-area macro dataset. This replaces the earlier API-based predictor notebook and keeps the macro inputs cleaner, better documented, and easier to reproduce.
 
 ## Project Workflow
 
-The current pipeline is split into three notebooks:
+The current pipeline is split into the main SPF cleaning/final-dataset notebooks plus the maintained EA-MD-QD preprocessing runner:
 
 1. `step1_data_cleaning.ipynb`
    - cleans the raw SPF individual files
    - builds long and wide SPF datasets
    - classifies rolling forecast horizons
 
-2. `step2_predictor_dataset.ipynb`
-   - builds the external predictor dataset
-   - adds euro-area macro-financial variables
-   - adds EU country-level macro predictors
-   - saves `Data/external_predictors.csv`
+2. `Data/EA-MD-QD-2026-04/RUN.ipynb`
+   - runs the maintained EA-MD-QD preprocessing routine
+   - creates the processed euro-area macro panel
+   - saves `Data/EA-MD-QD-2026-04/data_TR2/EAdataQM_TR2.xlsx`
 
 3. `step3_final_dataset.ipynb`
    - merges SPF forecasts with external predictors
@@ -59,7 +58,7 @@ The current pipeline is split into three notebooks:
 ```text
 Data/spf_clean_long.csv          # Clean SPF data in long panel format
 Data/spf_clean_wide.csv          # Clean SPF data in wide forecaster-level format
-Data/external_predictors.csv     # Survey-round external predictors
+Data/EA-MD-QD-2026-04/data_TR2/EAdataQM_TR2.xlsx  # Processed EA macro predictors
 Data/final_model_dataset.csv     # Final dataset for model training
 ```
 
